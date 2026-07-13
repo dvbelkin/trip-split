@@ -296,7 +296,8 @@ function Account() {
 function Trips() {
   const [trips, setTrips] = useState<Trip[] | null>(null),
     [open, setOpen] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [createError, setCreateError] = useState("");
   const nav = useNavigate();
   const load = () => api.trips().then(setTrips).catch((failure) => setError(failure.message));
   useEffect(() => {
@@ -304,14 +305,19 @@ function Trips() {
   }, []);
   async function create(e: any) {
     e.preventDefault();
-    const b = Object.fromEntries(new FormData(e.currentTarget));
-    const t = await api.createTrip(b);
-    nav("/trips/" + t.id);
+    setCreateError("");
+    try {
+      const b = Object.fromEntries(new FormData(e.currentTarget));
+      const t = await api.createTrip(b);
+      nav("/trips/" + t.id);
+    } catch (failure: any) {
+      setCreateError(failure.message);
+    }
   }
   return (
     <Shell>
       <main className="mx-auto max-w-6xl">
-        <PageHeader title="Мои поездки" description="Все путешествия, участники и общие расходы в одном месте." actions={<button className="btn-primary" onClick={() => setOpen(true)}><Plus size={18} /><span>Новая поездка</span></button>} />
+        <PageHeader title="Мои поездки" description="Все путешествия, участники и общие расходы в одном месте." actions={<button className="btn-primary" onClick={() => { setCreateError(""); setOpen(true); }}><Plus size={18} /><span>Новая поездка</span></button>} />
         {error ? <Alert variant="error">Не удалось загрузить поездки: {error}</Alert> : trips === null ? (
           <div className="grid animate-pulse gap-5 md:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-64 rounded-2xl bg-gray-200 dark:bg-white/10" />)}</div>
         ) : trips.length ? (
@@ -346,11 +352,12 @@ function Trips() {
             ))}
           </div>
         ) : (
-          <div className="card"><EmptyState icon={WalletCards} title="Пока здесь тихо" description="Создайте первую поездку и пригласите компанию." action={<button className="btn-primary" onClick={() => setOpen(true)}><Plus size={17} />Новая поездка</button>} /></div>
+          <div className="card"><EmptyState icon={WalletCards} title="Пока здесь тихо" description="Создайте первую поездку и пригласите компанию." action={<button className="btn-primary" onClick={() => { setCreateError(""); setOpen(true); }}><Plus size={17} />Новая поездка</button>} /></div>
         )}
         {open && (
           <Modal title="Новая поездка" onClose={() => setOpen(false)}>
             <form onSubmit={create} className="space-y-4">
+              {createError && <Alert variant="error">Не удалось создать поездку: {createError}</Alert>}
               <label>
                 <span className="label">Название</span>
                 <input

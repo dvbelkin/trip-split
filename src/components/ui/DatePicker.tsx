@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -13,20 +14,59 @@ const parseValue = (value?: string) => {
 export function DatePicker({ name, defaultValue = "", value, onChange, ariaLabel = "Выберите дату", required = false }: { name?: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; ariaLabel?: string; required?: boolean }) {
   const dialogId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const controlled = value !== undefined;
   const [internalValue, setInternalValue] = useState(defaultValue);
   const currentValue = controlled ? value : internalValue;
   const selectedDate = parseValue(currentValue);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !calendarRef.current?.contains(target)
+      )
+        setOpen(false);
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const gap = 6;
+      const viewportPadding = 8;
+      const panelWidth = 292;
+      const panelHeight = calendarRef.current?.offsetHeight || 380;
+      const roomBelow = window.innerHeight - rect.bottom - gap;
+      const roomAbove = rect.top - gap;
+      const top =
+        roomBelow >= panelHeight || roomBelow >= roomAbove
+          ? rect.bottom + gap
+          : Math.max(viewportPadding, rect.top - panelHeight - gap);
+      const left = Math.min(
+        Math.max(viewportPadding, rect.left),
+        window.innerWidth - panelWidth - viewportPadding,
+      );
+      setPosition({ top, left });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, viewDate]);
 
   const days = useMemo(() => {
     const year = viewDate.getFullYear();
@@ -47,12 +87,12 @@ export function DatePicker({ name, defaultValue = "", value, onChange, ariaLabel
   return (
     <div ref={rootRef} className="relative">
       {name && <input type="hidden" name={name} value={currentValue} />}
-      <button type="button" aria-label={ariaLabel} aria-expanded={open} aria-controls={dialogId} onClick={() => setOpen((state) => !state)} className="field flex items-center justify-between gap-3 text-left">
+      <button ref={buttonRef} type="button" aria-label={ariaLabel} aria-expanded={open} aria-controls={dialogId} onClick={() => setOpen((state) => !state)} className="field flex items-center justify-between gap-3 text-left">
         <span className={currentValue ? "" : "text-gray-400"}>{currentValue || "Выберите дату"}{required && !currentValue ? " *" : ""}</span>
         <CalendarDays className="size-4 shrink-0 text-gray-400" />
       </button>
-      {open && (
-        <div id={dialogId} role="dialog" aria-label={ariaLabel} className="absolute left-0 z-[80] mt-1.5 w-[292px] rounded-xl border bg-white p-3 shadow-overlay dark:bg-gray-900">
+      {open && createPortal(
+        <div ref={calendarRef} id={dialogId} role="dialog" aria-label={ariaLabel} className="fixed z-[100] w-[292px] rounded-xl border bg-white p-3 shadow-overlay dark:bg-gray-900" style={{ top: position.top, left: position.left }}>
           <div className="mb-3 flex items-center justify-between">
             <button type="button" aria-label="Предыдущий месяц" className="grid size-9 place-items-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}><ChevronLeft size={17} /></button>
             <strong className="text-sm">{months[viewDate.getMonth()]} {viewDate.getFullYear()}</strong>
@@ -72,7 +112,8 @@ export function DatePicker({ name, defaultValue = "", value, onChange, ariaLabel
             <button type="button" className="px-2 py-1.5 text-sm font-semibold text-gray-500" onClick={() => { if (!controlled) setInternalValue(""); onChange?.(""); setOpen(false); }}>Очистить</button>
             <button type="button" className="px-2 py-1.5 text-sm font-semibold text-forest dark:text-brand-300" onClick={() => choose(new Date())}>Сегодня</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

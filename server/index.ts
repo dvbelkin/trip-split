@@ -648,20 +648,23 @@ app.delete("/api/expenses/:id", (req: Req, res) => {
   db.prepare("DELETE FROM expenses WHERE id=?").run(e.id);
   res.status(204).end();
 });
-const uploadErrorHandler: express.ErrorRequestHandler = (
+const errorHandler: express.ErrorRequestHandler = (
   error,
   _req,
   res,
   next,
 ) => {
-  if (!(error instanceof multer.MulterError)) return next(error);
-  if (error.code === "LIMIT_FILE_SIZE")
-    return res
-      .status(413)
-      .json({ error: "Файл слишком большой. Максимальный размер — 8 МБ" });
-  return res.status(400).json({ error: "Не удалось загрузить файл" });
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE")
+      return res
+        .status(413)
+        .json({ error: "Файл слишком большой. Максимальный размер — 8 МБ" });
+    return res.status(400).json({ error: "Не удалось загрузить файл" });
+  }
+  console.error(error);
+  return res.status(500).json({ error: "Внутренняя ошибка сервера" });
 };
-app.use(uploadErrorHandler);
+app.use(errorHandler);
 const dist = path.resolve("dist");
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
