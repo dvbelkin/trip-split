@@ -652,4 +652,7 @@ if (fs.existsSync(dist)) {
   app.use(express.static(dist));
   app.get("/*splat", (_, res) => res.sendFile(path.join(dist, "index.html")));
 }
-app.listen(3001, () => console.log("API: http://localhost:3001"));
+const port = Number(process.env.PORT) || 3001;
+app.listen(port, "127.0.0.1", () =>
+  console.log(`API: http://127.0.0.1:${port}`),
+);
