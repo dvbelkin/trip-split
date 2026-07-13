@@ -51,8 +51,8 @@ export function Select({
     if (!next) return;
     const nextValue = String(next.value);
     if (!isControlled) setInternalValue(nextValue);
-    onChange?.(nextValue);
     setOpen(false);
+    onChange?.(nextValue);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -120,7 +120,11 @@ export function Select({
                 className={`flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${index === activeIndex ? "bg-gray-100 dark:bg-white/10" : ""} ${isSelected ? "font-semibold text-forest dark:text-brand-300" : "text-gray-700 dark:text-gray-200"}`}
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(index)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  choose(index);
+                }}
               >
                 <span className="truncate">{option.label}</span>
                 {isSelected && <Check className="size-4 shrink-0" />}
