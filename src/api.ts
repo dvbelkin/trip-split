@@ -52,6 +52,9 @@ export type Dashboard = {
     paid: number;
     share: number;
     balance: number;
+    fundContributed: number;
+    fundUsed: number;
+    fundRemaining: number;
   }[];
   settlements: { from: string; to: string; amount: number }[];
   fundTotal: number;

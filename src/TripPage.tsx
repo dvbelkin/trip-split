@@ -49,6 +49,9 @@ function ExpenseForm({
   onSave: (body: any) => Promise<void>;
 }) {
   const [error, setError] = useState("");
+  const [paidFromFund, setPaidFromFund] = useState(
+    Boolean(expense?.paid_from_fund),
+  );
   return (
     <form
       onSubmit={async (e) => {
@@ -100,11 +103,13 @@ function ExpenseForm({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label>
-          <span className="label">Кто заплатил</span>
+          <span className="label">
+            {paidFromFund ? "Кто оформил расход" : "Кто заплатил"}
+          </span>
           <Select
             name="paid_by"
             defaultValue={expense?.paid_by}
-            ariaLabel="Кто заплатил"
+            ariaLabel={paidFromFund ? "Кто оформил расход" : "Кто заплатил"}
             options={members.map((member) => ({ value: member.id, label: member.name }))}
           />
         </label>
@@ -133,7 +138,7 @@ function ExpenseForm({
           ))}
         </div>
       </fieldset>
-      <Checkbox name="paid_from_fund" value="1" defaultChecked={Boolean(expense?.paid_from_fund)} label="Оплачено из общей кассы" className="rounded-xl bg-sage/60 p-3 font-semibold dark:bg-brand-500/10" />
+      <Checkbox name="paid_from_fund" value="1" checked={paidFromFund} onChange={setPaidFromFund} label="Оплачено из общей кассы" className="rounded-xl bg-sage/60 p-3 font-semibold dark:bg-brand-500/10" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button className="btn-primary w-full">
         {expense ? "Сохранить изменения" : "Сохранить расход"}
@@ -312,6 +317,9 @@ export default function TripPage() {
             Внесено: {money(dashboard.fundTotal, trip.currency)} · Потрачено:{" "}
             {money(dashboard.fundSpent, trip.currency)}
           </div>
+          <p className="basis-full text-xs text-gray-500 dark:text-gray-400">
+            Остаток закреплён за участниками, которые внесли деньги.
+          </p>
         </section>
         <section className="grid lg:grid-cols-5 gap-5">
           <div className="card overflow-visible p-0 lg:col-span-5">
@@ -403,13 +411,20 @@ export default function TripPage() {
             )}
             <h3 className="font-bold text-sm mt-7 mb-3">Баланс участников</h3>
             {dashboard.byMember.map((m) => (
-              <div key={m.name} className="flex justify-between py-2 text-sm">
-                <span className="flex gap-2 items-center">
+              <div key={m.name} className="flex justify-between gap-3 py-2 text-sm">
+                <span className="flex min-w-0 gap-2 items-start">
                   <i
-                    className="w-2.5 h-2.5 rounded-full"
+                    className="mt-1 w-2.5 h-2.5 shrink-0 rounded-full"
                     style={{ background: m.color }}
                   />
-                  {m.name}
+                  <span>
+                    <span className="block">{m.name}</span>
+                    {m.fundUsed > 0 && (
+                      <span className="muted block text-xs">
+                        Из кассы оплачено {money(m.fundUsed, trip.currency)}
+                      </span>
+                    )}
+                  </span>
                 </span>
                 <b className={m.balance >= 0 ? "text-forest" : "text-coral"}>
                   {m.balance > 0 ? "+" : ""}
@@ -701,6 +716,28 @@ export default function TripPage() {
       )}
       {modal === "fund" && (
         <Modal title="Общая касса" onClose={close}>
+          <div className="mb-6 rounded-xl bg-sage/50 p-4 dark:bg-brand-500/10">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div><span className="muted block text-xs">Внесено</span><b className="mt-1 block text-sm">{money(dashboard.fundTotal, trip.currency)}</b></div>
+              <div><span className="muted block text-xs">Потрачено</span><b className="mt-1 block text-sm">{money(dashboard.fundSpent, trip.currency)}</b></div>
+              <div><span className="muted block text-xs">Осталось</span><b className="mt-1 block text-sm text-forest">{money(dashboard.fundTotal - dashboard.fundSpent, trip.currency)}</b></div>
+            </div>
+            <p className="muted mt-3 text-xs leading-5">
+              Использованная часть кассы засчитывается внесшим участникам
+              пропорционально их взносам. Остаток остаётся их возвратным авансом.
+            </p>
+          </div>
+          {dashboard.byMember.some((member) => member.fundContributed > 0) && (
+            <div className="mb-6 space-y-2">
+              <h3 className="text-sm font-semibold">Авансы участников</h3>
+              {dashboard.byMember.filter((member) => member.fundContributed > 0).map((member) => (
+                <div key={member.name} className="rounded-xl border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3"><b>{member.name}</b><b className="text-forest">{money(member.fundRemaining, trip.currency)} осталось</b></div>
+                  <p className="muted mt-1 text-xs">Внесено {money(member.fundContributed, trip.currency)} · использовано {money(member.fundUsed, trip.currency)}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <form
             className="space-y-3 mb-6"
             onSubmit={async (e) => {

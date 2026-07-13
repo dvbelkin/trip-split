@@ -281,12 +281,50 @@ function payload(id: number, viewerId?: number) {
       `SELECT c.*,m.name member_name,m.color member_color FROM contributions c JOIN members m ON m.id=c.member_id WHERE c.trip_id=? ORDER BY c.date DESC,c.id DESC`,
     )
     .all(id) as any[];
+  const fundTotal = contributions.reduce((sum, item) => sum + item.amount, 0);
+  const fundSpent = expenses
+    .filter((expense) => expense.paid_from_fund)
+    .reduce((sum, expense) => sum + expense.amount, 0);
+  const contributionTotals = new Map<number, number>();
+  for (const contribution of contributions)
+    contributionTotals.set(
+      contribution.member_id,
+      (contributionTotals.get(contribution.member_id) || 0) +
+        contribution.amount,
+    );
   const balances = new Map(
-    members.map((m) => [m.id, { ...m, paid: 0, share: 0, balance: 0 }]),
+    members.map((member) => [
+      member.id,
+      {
+        ...member,
+        paid: 0,
+        share: 0,
+        balance: 0,
+        fundContributed: contributionTotals.get(member.id) || 0,
+        fundUsed: 0,
+        fundRemaining: contributionTotals.get(member.id) || 0,
+      },
+    ]),
   );
+  const contributors = members.filter(
+    (member) => (contributionTotals.get(member.id) || 0) > 0,
+  );
+  const allocatableFundSpent = Math.min(fundSpent, fundTotal);
+  let allocatedFundSpent = 0;
+  contributors.forEach((member, index) => {
+    const contributed = contributionTotals.get(member.id) || 0;
+    const used =
+      index === contributors.length - 1
+        ? allocatableFundSpent - allocatedFundSpent
+        : Math.floor((allocatableFundSpent * contributed) / fundTotal);
+    allocatedFundSpent += used;
+    const balance = balances.get(member.id);
+    balance.fundUsed = used;
+    balance.fundRemaining = contributed - used;
+    balance.paid += used;
+  });
   for (const e of expenses) {
-    if (e.paid_from_fund) continue;
-    balances.get(e.paid_by).paid += e.amount;
+    if (!e.paid_from_fund) balances.get(e.paid_by).paid += e.amount;
     const base = Math.floor(e.amount / e.participant_ids.length),
       rem = e.amount % e.participant_ids.length;
     e.participant_ids.forEach(
@@ -332,10 +370,8 @@ function payload(id: number, viewerId?: number) {
       byCategory,
       byMember: [...balances.values()],
       settlements,
-      fundTotal: contributions.reduce((s, c) => s + c.amount, 0),
-      fundSpent: expenses
-        .filter((e) => e.paid_from_fund)
-        .reduce((s, e) => s + e.amount, 0),
+      fundTotal,
+      fundSpent,
     },
     contributions,
   };
@@ -571,6 +607,29 @@ app.post("/api/trips/:id/contributions", (req: Req, res) => {
     db.prepare("SELECT * FROM contributions WHERE id=?").get(x.lastInsertRowid),
   );
 });
+const getFundAmounts = (tripId: string | number, excludeExpenseId?: number) => {
+  const total = (
+    db
+      .prepare(
+        "SELECT COALESCE(SUM(amount),0) total FROM contributions WHERE trip_id=?",
+      )
+      .get(tripId) as any
+  ).total as number;
+  const spent = (
+    excludeExpenseId
+      ? db
+          .prepare(
+            "SELECT COALESCE(SUM(amount),0) spent FROM expenses WHERE trip_id=? AND paid_from_fund=1 AND id<>?",
+          )
+          .get(tripId, excludeExpenseId)
+      : db
+          .prepare(
+            "SELECT COALESCE(SUM(amount),0) spent FROM expenses WHERE trip_id=? AND paid_from_fund=1",
+          )
+          .get(tripId)
+  ) as any;
+  return { total, spent: spent.spent as number };
+};
 app.delete("/api/contributions/:id", (req: Req, res) => {
   const c = db
     .prepare(
@@ -579,6 +638,11 @@ app.delete("/api/contributions/:id", (req: Req, res) => {
     .get(req.params.id) as any;
   if (!c || (c.owner_id !== req.userId && c.created_by !== req.userId))
     return res.status(403).json({ error: "Недостаточно прав" });
+  const fund = getFundAmounts(c.trip_id);
+  if (fund.total - c.amount < fund.spent)
+    return res.status(409).json({
+      error: "Нельзя удалить взнос: часть этих денег уже потрачена",
+    });
   db.prepare("DELETE FROM contributions WHERE id=?").run(c.id);
   res.status(204).end();
 });
@@ -593,8 +657,16 @@ app.post("/api/trips/:id/expenses", (req: Req, res) => {
     participant_ids,
     paid_from_fund,
   } = req.body;
-  if (!title || !amount || !participant_ids?.length)
+  const amountInCents = Math.round(Number(amount) * 100);
+  if (!title || !Number.isFinite(amountInCents) || amountInCents <= 0 || !participant_ids?.length)
     return res.status(400).json({ error: "Заполните данные расхода" });
+  if (paid_from_fund) {
+    const fund = getFundAmounts(req.params.id);
+    if (amountInCents > fund.total - fund.spent)
+      return res.status(409).json({
+        error: "В общей кассе недостаточно средств для этого расхода",
+      });
+  }
   db.transaction(() => {
     const e = db
       .prepare(
@@ -603,7 +675,7 @@ app.post("/api/trips/:id/expenses", (req: Req, res) => {
       .run(
         req.params.id,
         title,
-        Math.round(Number(amount) * 100),
+        amountInCents,
         date,
         paid_by,
         category_id,
@@ -638,14 +710,22 @@ app.patch("/api/expenses/:id", (req: Req, res) => {
     participant_ids,
     paid_from_fund,
   } = req.body;
-  if (!title || !amount || !participant_ids?.length)
+  const amountInCents = Math.round(Number(amount) * 100);
+  if (!title || !Number.isFinite(amountInCents) || amountInCents <= 0 || !participant_ids?.length)
     return res.status(400).json({ error: "Заполните данные расхода" });
+  if (paid_from_fund) {
+    const fund = getFundAmounts(e.trip_id, e.id);
+    if (amountInCents > fund.total - fund.spent)
+      return res.status(409).json({
+        error: "В общей кассе недостаточно средств для этого расхода",
+      });
+  }
   db.transaction(() => {
     db.prepare(
       "UPDATE expenses SET title=?,amount=?,date=?,paid_by=?,category_id=?,paid_from_fund=? WHERE id=?",
     ).run(
       title,
-      Math.round(Number(amount) * 100),
+      amountInCents,
       date,
       paid_by,
       category_id,
