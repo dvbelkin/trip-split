@@ -228,7 +228,10 @@ export default function TripPage() {
             <button className="btn-secondary" onClick={() => setModal("fund")}>
               Общая касса
             </button>
-            <label className="btn-secondary cursor-pointer">
+            <label
+              className="btn-secondary cursor-pointer"
+              title="JPG, PNG или WebP, не больше 8 МБ"
+            >
               Обложка
               <input
                 className="hidden"

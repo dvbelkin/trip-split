@@ -184,7 +184,7 @@ function Account() {
           <div>
             <h2 className="font-bold text-lg">Фотография</h2>
             <p className="text-sm text-black/45 mt-1 mb-4">
-              JPG, PNG, WebP или GIF, не больше 1 МБ
+              JPG, PNG, WebP или GIF, не больше 8 МБ
             </p>
             <label className="btn-secondary cursor-pointer">
               Выбрать файл

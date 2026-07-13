@@ -54,6 +54,7 @@ db.exec(
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_member_trip_user ON members(trip_id,user_id) WHERE user_id IS NOT NULL",
 );
 const app = express();
+const maxUploadSize = 8 * 1024 * 1024;
 app.use(cors());
 app.use(express.json());
 app.use("/avatars", express.static("data/avatars"));
@@ -67,7 +68,7 @@ const avatarUpload = multer({
         `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`,
       ),
   }),
-  limits: { fileSize: 1024 * 1024 },
+  limits: { fileSize: maxUploadSize },
   fileFilter: (_req, file, cb) =>
     cb(
       null,
@@ -85,7 +86,7 @@ const coverUpload = multer({
         `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`,
       ),
   }),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: maxUploadSize },
   fileFilter: (_req, file, cb) =>
     cb(null, ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)),
 });
@@ -181,7 +182,7 @@ app.post("/api/me/avatar", avatarUpload.single("avatar"), (req: Req, res) => {
   if (!req.file)
     return res
       .status(400)
-      .json({ error: "Выберите JPG, PNG, WebP или GIF до 1 МБ" });
+      .json({ error: "Выберите JPG, PNG, WebP или GIF до 8 МБ" });
   const user = db
     .prepare("SELECT avatar FROM users WHERE id=?")
     .get(req.userId) as any;
@@ -517,7 +518,7 @@ app.post(
     if (!req.file)
       return res
         .status(400)
-        .json({ error: "Выберите JPG, PNG или WebP до 2 МБ" });
+        .json({ error: "Выберите JPG, PNG или WebP до 8 МБ" });
     if (trip.cover)
       fs.rmSync(path.join("data/covers", path.basename(trip.cover)), {
         force: true,
@@ -647,6 +648,20 @@ app.delete("/api/expenses/:id", (req: Req, res) => {
   db.prepare("DELETE FROM expenses WHERE id=?").run(e.id);
   res.status(204).end();
 });
+const uploadErrorHandler: express.ErrorRequestHandler = (
+  error,
+  _req,
+  res,
+  next,
+) => {
+  if (!(error instanceof multer.MulterError)) return next(error);
+  if (error.code === "LIMIT_FILE_SIZE")
+    return res
+      .status(413)
+      .json({ error: "Файл слишком большой. Максимальный размер — 8 МБ" });
+  return res.status(400).json({ error: "Не удалось загрузить файл" });
+};
+app.use(uploadErrorHandler);
 const dist = path.resolve("dist");
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
