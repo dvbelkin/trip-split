@@ -96,9 +96,12 @@ export const api = {
       expenses: Expense[];
       dashboard: Dashboard;
       contributions: Contribution[];
+      can_delete: boolean;
     }>(`/trips/${id}`),
   updateTrip: (id: string, body: unknown) =>
     call<Trip>(`/trips/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteTrip: (id: string) =>
+    call<void>(`/trips/${id}`, { method: "DELETE" }),
   addMember: (id: string, body: unknown) =>
     call<Member>(`/trips/${id}/members`, {
       method: "POST",

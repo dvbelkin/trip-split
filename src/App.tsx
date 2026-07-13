@@ -3,6 +3,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
   useNavigate,
   useParams,
   Link,
@@ -294,15 +295,21 @@ function Account() {
   );
 }
 function Trips() {
+  const location = useLocation();
   const [trips, setTrips] = useState<Trip[] | null>(null),
     [open, setOpen] = useState(false),
     [error, setError] = useState(""),
-    [createError, setCreateError] = useState("");
+    [createError, setCreateError] = useState(""),
+    [notice] = useState(() => (location.state as { notice?: string } | null)?.notice || "");
   const nav = useNavigate();
   const load = () => api.trips().then(setTrips).catch((failure) => setError(failure.message));
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if ((location.state as { notice?: string } | null)?.notice)
+      nav("/", { replace: true, state: null });
+  }, [location.state, nav]);
   async function create(e: any) {
     e.preventDefault();
     setCreateError("");
@@ -318,6 +325,7 @@ function Trips() {
     <Shell>
       <main className="mx-auto max-w-6xl">
         <PageHeader title="Мои поездки" description="Все путешествия, участники и общие расходы в одном месте." actions={<button className="btn-primary" onClick={() => { setCreateError(""); setOpen(true); }}><Plus size={18} /><span>Новая поездка</span></button>} />
+        {notice && <div className="mb-5"><Alert variant="success">{notice}</Alert></div>}
         {error ? <Alert variant="error">Не удалось загрузить поездки: {error}</Alert> : trips === null ? (
           <div className="grid animate-pulse gap-5 md:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-64 rounded-2xl bg-gray-200 dark:bg-white/10" />)}</div>
         ) : trips.length ? (

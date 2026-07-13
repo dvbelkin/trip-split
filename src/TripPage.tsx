@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   ChevronLeft,
@@ -23,6 +23,7 @@ import {
 } from "./api";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Alert } from "./components/ui/Alert";
+import { Button } from "./components/ui/Button";
 import { Checkbox } from "./components/ui/Checkbox";
 import { ColorPicker } from "./components/ui/ColorPicker";
 import { DatePicker } from "./components/ui/DatePicker";
@@ -142,6 +143,7 @@ function ExpenseForm({
 }
 export default function TripPage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState<{
       trip: Trip;
       members: Member[];
@@ -149,6 +151,7 @@ export default function TripPage() {
       expenses: Expense[];
       dashboard: Dashboard;
       contributions: Contribution[];
+      can_delete: boolean;
     } | null>(null),
     [modal, setModal] = useState(""),
     [editing, setEditing] = useState<Expense | null>(null),
@@ -157,7 +160,8 @@ export default function TripPage() {
     [query, setQuery] = useState(""),
     [categoryFilter, setCategoryFilter] = useState("all"),
     [memberFilter, setMemberFilter] = useState("all"),
-    [page, setPage] = useState(1);
+    [page, setPage] = useState(1),
+    [deleting, setDeleting] = useState(false);
   const load = async () => {
     setLoadError("");
     try {
@@ -197,7 +201,7 @@ export default function TripPage() {
         </div>
       </div>
     );
-  const { trip, members, categories, expenses, dashboard, contributions } =
+  const { trip, members, categories, expenses, dashboard, contributions, can_delete } =
     data;
   const close = () => {
     setModal("");
@@ -213,6 +217,9 @@ export default function TripPage() {
           description={<span className="flex items-center gap-2"><CalendarDays size={16} />{trip.start_date || "Даты не указаны"}{trip.end_date && ` — ${trip.end_date}`}</span>}
           actions={
             <div className="flex items-center gap-2">
+              {can_delete && (
+                <button aria-label="Удалить поездку" title="Удалить пустую поездку" className="grid size-11 place-items-center rounded-lg bg-error-50 text-error-700 hover:bg-red-100 dark:bg-error-500/15 dark:text-red-300" onClick={() => setModal("delete-trip")}><Trash2 size={18} /></button>
+              )}
               <button aria-label="Изменить название" title="Изменить название" className="grid size-11 place-items-center rounded-lg border bg-white text-gray-500 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10" onClick={() => setModal("rename")}><Pencil size={18} /></button>
               <button className="btn-primary" onClick={() => setModal("expense")}><Plus size={17} />Расход</button>
             </div>
@@ -465,6 +472,41 @@ export default function TripPage() {
             {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
             <button className="btn-primary w-full">Сохранить</button>
           </form>
+        </Modal>
+      )}
+      {modal === "delete-trip" && (
+        <Modal title="Удалить поездку?" onClose={close} size="sm">
+          <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+            Поездка «{trip.name}» и все её участники, статьи и данные общей
+            кассы будут удалены без возможности восстановления.
+          </p>
+          {error && <div className="mt-4"><Alert variant="error">{error}</Alert></div>}
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={close} disabled={deleting}>
+              Отмена
+            </Button>
+            <Button
+              variant="danger"
+              startIcon={<Trash2 size={16} />}
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                setError("");
+                try {
+                  await api.deleteTrip(id);
+                  navigate("/", {
+                    replace: true,
+                    state: { notice: `Поездка «${trip.name}» удалена` },
+                  });
+                } catch (failure: any) {
+                  setError(failure.message);
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Удаляем…" : "Удалить поездку"}
+            </Button>
+          </div>
         </Modal>
       )}
       {modal === "members" && (

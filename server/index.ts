@@ -252,8 +252,8 @@ const access = (id: string, u?: number) =>
       "SELECT t.* FROM trips t LEFT JOIN members m ON m.trip_id=t.id AND m.user_id=? WHERE t.id=? AND (t.user_id=? OR m.id IS NOT NULL)",
     )
     .get(u, id, u) as any;
-function payload(id: number) {
-  const trip = db.prepare("SELECT * FROM trips WHERE id=?").get(id);
+function payload(id: number, viewerId?: number) {
+  const trip = db.prepare("SELECT * FROM trips WHERE id=?").get(id) as any;
   const members = db
     .prepare("SELECT * FROM members WHERE trip_id=? ORDER BY id")
     .all(id) as any[];
@@ -322,6 +322,7 @@ function payload(id: number) {
     .filter((c) => c.amount);
   return {
     trip,
+    can_delete: trip.user_id === viewerId && expenses.length === 0,
     members,
     categories,
     expenses,
@@ -342,7 +343,7 @@ function payload(id: number) {
 app.get("/api/trips/:id", (req: Req, res) => {
   if (!access(req.params.id, req.userId))
     return res.status(404).json({ error: "Поездка не найдена" });
-  res.json(payload(+req.params.id));
+  res.json(payload(+req.params.id, req.userId));
 });
 app.patch("/api/trips/:id", (req: Req, res) => {
   if (!own(req.params.id, req.userId))
@@ -356,6 +357,27 @@ app.patch("/api/trips/:id", (req: Req, res) => {
       .json({ error: "Название должно содержать от 2 до 80 символов" });
   db.prepare("UPDATE trips SET name=? WHERE id=?").run(name, req.params.id);
   res.json(db.prepare("SELECT * FROM trips WHERE id=?").get(req.params.id));
+});
+app.delete("/api/trips/:id", (req: Req, res) => {
+  const trip = own(req.params.id, req.userId);
+  if (!trip)
+    return res
+      .status(403)
+      .json({ error: "Только владелец может удалить поездку" });
+  if (
+    db
+      .prepare("SELECT 1 FROM expenses WHERE trip_id=? LIMIT 1")
+      .get(req.params.id)
+  )
+    return res
+      .status(409)
+      .json({ error: "Удалить можно только поездку без расходов" });
+  db.prepare("DELETE FROM trips WHERE id=?").run(req.params.id);
+  if (trip.cover)
+    fs.rmSync(path.join("data/covers", path.basename(trip.cover)), {
+      force: true,
+    });
+  res.status(204).end();
 });
 app.post("/api/trips/:id/members", (req: Req, res) => {
   if (!own(req.params.id, req.userId)) return res.sendStatus(404);
