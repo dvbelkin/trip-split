@@ -1,0 +1,161 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Manrope", sans-serif;
+  --font-display: "Playfair Display", serif;
+
+  --color-ink: #17211b;
+  --color-cream: #f7f8f5;
+  --color-sage: #e8f0ea;
+  --color-forest: #295943;
+  --color-coral: #e87b5f;
+
+  --color-brand-50: #f0f7f3;
+  --color-brand-100: #dcebe2;
+  --color-brand-200: #b9d8c6;
+  --color-brand-300: #8cbea2;
+  --color-brand-400: #65a482;
+  --color-brand-500: #3f7e5f;
+  --color-brand-600: #295943;
+  --color-brand-700: #214936;
+  --color-brand-800: #1c3b2e;
+  --color-brand-900: #172f26;
+
+  --color-success-50: #ecfdf3;
+  --color-success-500: #12b76a;
+  --color-success-700: #027a48;
+  --color-warning-50: #fffaeb;
+  --color-warning-500: #f79009;
+  --color-warning-700: #b54708;
+  --color-error-50: #fef3f2;
+  --color-error-500: #f04438;
+  --color-error-700: #b42318;
+  --color-info-50: #eff8ff;
+  --color-info-500: #2e90fa;
+  --color-info-700: #175cd3;
+
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 12px rgba(16, 24, 40, 0.04);
+  --shadow-overlay: 0 24px 48px -12px rgba(16, 24, 40, 0.25);
+}
+
+:root {
+  color-scheme: light;
+  --app-bg: #f7f8f5;
+  --surface: #ffffff;
+  --surface-subtle: #f2f5f1;
+  --text-primary: #17211b;
+  --text-secondary: #66736c;
+  --border: #e3e8e4;
+}
+
+.dark {
+  color-scheme: dark;
+  --app-bg: #101814;
+  --surface: #17211b;
+  --surface-subtle: #1e2b24;
+  --text-primary: #f4f7f5;
+  --text-secondary: #a6b3ac;
+  --border: #2e3c34;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  html {
+    min-width: 320px;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: var(--app-bg);
+    color: var(--text-primary);
+    font-family: "Manrope", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  button,
+  a,
+  label,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid color-mix(in srgb, #295943 22%, transparent);
+    outline-offset: 2px;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border p-5 shadow-soft;
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-forest px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-bold text-forest transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/5 dark:text-brand-300 dark:hover:bg-white/10;
+    border-color: var(--border);
+  }
+
+  .field {
+    @apply min-h-11 w-full rounded-lg border bg-transparent px-3.5 py-2.5 text-sm outline-none transition placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50;
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .field:focus {
+    border-color: #8cbea2;
+    box-shadow: 0 0 0 4px rgba(41, 89, 67, 0.1);
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-semibold;
+    color: var(--text-secondary);
+  }
+
+  .muted {
+    color: var(--text-secondary);
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    @apply p-4;
+  }
+
+  .field {
+    @apply min-h-12 text-base;
+  }
+}

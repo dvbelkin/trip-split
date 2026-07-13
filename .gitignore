@@ -1,0 +1,12 @@
+node_modules
+dist
+*.tsbuildinfo
+*.log
+.DS_Store
+data/*.db*
+data/avatars/
+data/covers/
+.env
+.env.*
+!.env.example
+.playwright-cli
