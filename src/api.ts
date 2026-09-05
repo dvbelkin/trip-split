@@ -72,6 +72,11 @@ const call = async <T>(path: string, options: RequestInit = {}) => {
     },
   });
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth/")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.replace("/login");
+    }
     const body = await res
       .json()
       .catch(() => ({ error: `Ошибка сервера (${res.status})` }));
